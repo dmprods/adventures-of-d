@@ -168,27 +168,27 @@ const DIALOGUES = {
   level1: [
     { speaker: 'M', text: "Ready for a friendly match, D? \u26bd" },
     { speaker: 'D', text: "Always ready. Let's go!" },
-    { speaker: 'M', text: "Score 3 goals to win! Use WASD to move and SPACE to kick. And keep an eye out for hidden hearts \u2764\ufe0f" },
+    { speaker: 'M', text: "Score 3 goals to win! And keep an eye out for hidden hearts \u2764\ufe0f" },
   ],
   level2: [
     { speaker: 'M', text: "Blistering barnacles! This looks like a Tintin adventure!" },
     { speaker: 'D', text: "Great snakes! Captain Haddock, is that you?" },
-    { speaker: 'M', text: "Collect the glowing orbs and find the hidden treasure chest! Use WASD to explore." },
+    { speaker: 'M', text: "Collect the glowing orbs and find the hidden treasure chest!" },
   ],
   level3: [
     { speaker: 'M', text: "Someone's been waiting for you." },
     { speaker: 'D', text: "Milo!" },
-    { speaker: 'M', text: "Throw the ball with SPACE and let Milo fetch it back. Do it 3 times!" },
+    { speaker: 'M', text: "Throw the ball and let Milo fetch it back. Do it 3 times!" },
   ],
   level4: [
     { speaker: 'M', text: "Ready for a swim, baby?" },
     { speaker: 'D', text: "You know I never say no to water." },
-    { speaker: 'M', text: "Collect 6 golden rings! Use WASD to swim and SPACE to swim up. Watch out for jellyfish!" },
+    { speaker: 'M', text: "Collect 6 golden rings! Watch out for jellyfish!" },
   ],
   level5: [
     { speaker: 'M', text: "One last journey, D." },
     { speaker: 'D', text: "Where are we going?" },
-    { speaker: 'M', text: "Drive home! Steer with Left/Right and accelerate with Up. Stay on the road!" },
+    { speaker: 'M', text: "Drive home! Stay on the road!" },
   ],
 };
 
@@ -1150,7 +1150,7 @@ function showEnding() {
     const botEl = document.getElementById('endMsgBottom');
     topEl.style.opacity = '0'; botEl.style.opacity = '0';
     topEl.textContent = 'Every adventure had one destination.';
-    botEl.textContent = 'Home, with you.';
+    botEl.innerHTML = 'Home, with you.<br><span style="font-size:22px;letter-spacing:5px;margin-top:10px;display:inline-block">D \u2764\ufe0f M</span>';
     setTimeout(() => { topEl.style.opacity = '1'; topEl.style.transition = 'opacity 2s'; }, 1500);
     setTimeout(() => { botEl.style.opacity = '1'; botEl.style.transition = 'opacity 2s'; }, 3000);
     playPiano();
