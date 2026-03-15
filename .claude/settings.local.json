@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:docs.meshy.ai)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(GH=/tmp/gh/gh_2.63.2_macOS_arm64/bin/gh)",
+      "Bash($GH auth:*)",
+      "Bash(git push:*)",
+      "Bash($GH run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

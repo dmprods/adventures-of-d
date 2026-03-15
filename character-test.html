@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Duleep - 3D Realistic Character</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f1a;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:Georgia,serif;color:#fff}
+canvas{border-radius:8px;background:#111}
+</style>
+</head>
+<body>
+<canvas id="C" width="960" height="720"></canvas>
+<script>
+const cv=document.getElementById('C'),c=cv.getContext('2d');
+c.imageSmoothingEnabled=true;
+c.imageSmoothingQuality='high';
+let frame=0;
+
+// Light direction: top-left
+const LX=-0.4,LY=-0.6,LZ=0.7;
+
+// 3D sphere shading helper
+function sphere(cx,cy,r,baseR,baseG,baseB,alpha=1){
+  const g=c.createRadialGradient(cx-r*.3,cy-r*.35,r*.1,cx,cy,r);
+  g.addColorStop(0,`rgba(${baseR+50},${baseG+40},${baseB+30},${alpha})`);
+  g.addColorStop(.4,`rgba(${baseR},${baseG},${baseB},${alpha})`);
+  g.addColorStop(.8,`rgba(${baseR-40},${baseG-35},${baseB-25},${alpha})`);
+  g.addColorStop(1,`rgba(${baseR-70},${baseG-60},${baseB-45},${alpha})`);
+  c.fillStyle=g;
+  c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.fill();
+}
+
+// 3D cylinder (limb) helper
+function cylinder(x1,y1,x2,y2,w,r,g,b){
+  const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+  const nx=-dy/len,ny=dx/len;
+  const grad=c.createLinearGradient(x1+nx*w,y1+ny*w,x1-nx*w,y1-ny*w);
+  grad.addColorStop(0,`rgb(${r-35},${g-30},${b-25})`);
+  grad.addColorStop(.25,`rgb(${r+15},${g+10},${b+5})`);
+  grad.addColorStop(.5,`rgb(${r+30},${g+25},${b+15})`);
+  grad.addColorStop(.75,`rgb(${r},${g},${b})`);
+  grad.addColorStop(1,`rgb(${r-50},${g-45},${b-35})`);
+  c.fillStyle=grad;
+  c.beginPath();
+  c.moveTo(x1+nx*w,y1+ny*w);
+  c.lineTo(x2+nx*w,y2+ny*w);
+  c.lineTo(x2-nx*w,y2-ny*w);
+  c.lineTo(x1-nx*w,y1-ny*w);
+  c.closePath();c.fill();
+}
+
+// Rounded rect helper
+function rRect(x,y,w,h,r){
+  c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r);c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h);c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.closePath();
+}
+
+// =========================================================
+// DULEEP - 3D REALISTIC CHARACTER
+// =========================================================
+function drawDuleep3D(px,py,scale,facing,anim,state){
+  c.save();
+  c.translate(px,py);
+  c.scale(scale*(facing<0?-1:1),scale);
+
+  const sk={r:184,g:118,b:62};  // skin base
+  const skL={r:210,g:145,b:88}; // skin light
+  const skD={r:140,g:85,b:40};  // skin dark
+
+  const bob=state==='run'?Math.sin(anim*.3)*3:state==='idle'?Math.sin(anim*.04)*1.2:0;
+  const legSw=state==='run'?Math.sin(anim*.3)*18:0;
+  const armSw=state==='run'?Math.sin(anim*.3)*15:0;
+  const by=bob;
+
+  // ==== SHADOW ====
+  c.fillStyle='rgba(0,0,0,.18)';
+  c.beginPath();c.ellipse(0,32,16,4,0,0,Math.PI*2);c.fill();
+
+  // ==== SWIMMING ====
+  if(state==='swim'){
+    const aSwim=Math.sin(anim*.12)*25;
+
+    // Back arm
+    c.save();c.translate(-8,-2+by);c.rotate((-50+aSwim)*Math.PI/180);
+    cylinder(0,0,18,0,4,sk.r,sk.g,sk.b);
+    c.save();c.translate(18,0);c.rotate(-20*Math.PI/180);
+    cylinder(0,0,15,0,3.5,sk.r,sk.g,sk.b);
+    sphere(15,0,4,skL.r,skL.g,skL.b);// hand
+    c.restore();c.restore();
+
+    // Torso
+    drawTorso3D(0,-6+by,true);
+
+    // Front arm
+    c.save();c.translate(8,-2+by);c.rotate((35-aSwim)*Math.PI/180);
+    cylinder(0,0,18,0,4,sk.r,sk.g,sk.b);
+    c.save();c.translate(18,0);c.rotate(10*Math.PI/180);
+    cylinder(0,0,15,0,3.5,sk.r,sk.g,sk.b);
+    sphere(15,0,4,skL.r,skL.g,skL.b);
+    c.restore();c.restore();
+
+    // Neck
+    cylinder(0,-10+by,0,-18+by,5,sk.r,sk.g,sk.b);
+
+    // Head
+    drawHead3D(0,-30+by,anim);
+
+    // Water effect
+    c.fillStyle='rgba(30,120,220,.12)';
+    c.fillRect(-30,6+by,60,20);
+    c.fillStyle='rgba(255,255,255,.08)';
+    for(let i=0;i<8;i++)c.fillRect(-22+i*6+Math.sin(anim*.1+i)*3,5+by+Math.random()*3,4,1.5);
+
+    c.restore();return;
+  }
+
+  // ==== LEGS ====
+  const shortsR=70,shortsG=72,shortsB=80;
+
+  // Left leg
+  c.save();c.translate(-6,12+by);c.rotate(legSw*Math.PI/180);
+  // Shorts
+  const sg1=c.createLinearGradient(-5,0,5,0);
+  sg1.addColorStop(0,`rgb(${shortsR-15},${shortsG-15},${shortsB-15})`);
+  sg1.addColorStop(.4,`rgb(${shortsR+10},${shortsG+10},${shortsB+10})`);
+  sg1.addColorStop(1,`rgb(${shortsR-20},${shortsG-20},${shortsB-20})`);
+  c.fillStyle=sg1;
+  rRect(-5,0,10,10,2);c.fill();
+  // Thigh
+  cylinder(0,10,0,20,5,sk.r,sk.g,sk.b);
+  // Knee cap
+  sphere(0,20,4,skL.r-5,skL.g-5,skL.b-5);
+  // Shin
+  cylinder(0,20,0,32,4.5,sk.r,sk.g,sk.b);
+  // Calf muscle
+  c.fillStyle=`rgba(${skL.r},${skL.g},${skL.b},.4)`;
+  c.beginPath();c.ellipse(1.5,25,3,4.5,.1,0,Math.PI*2);c.fill();
+  // Ankle
+  sphere(0,32,3.5,sk.r-10,sk.g-10,sk.b-10);
+  // Shoe
+  drawShoe3D(0,34);
+  c.restore();
+
+  // Right leg
+  c.save();c.translate(6,12+by);c.rotate(-legSw*Math.PI/180);
+  c.fillStyle=sg1;rRect(-5,0,10,10,2);c.fill();
+  cylinder(0,10,0,20,5,sk.r,sk.g,sk.b);
+  sphere(0,20,4,skL.r-5,skL.g-5,skL.b-5);
+  cylinder(0,20,0,32,4.5,sk.r,sk.g,sk.b);
+  c.fillStyle=`rgba(${skL.r},${skL.g},${skL.b},.4)`;
+  c.beginPath();c.ellipse(1.5,25,3,4.5,.1,0,Math.PI*2);c.fill();
+  sphere(0,32,3.5,sk.r-10,sk.g-10,sk.b-10);
+  drawShoe3D(0,34);
+  c.restore();
+
+  // Kick leg
+  if(state==='kick'){
+    c.save();c.translate(7,10+by);c.rotate(-60*Math.PI/180);
+    cylinder(0,0,0,20,5,sk.r,sk.g,sk.b);
+    sphere(0,20,4,skL.r-5,skL.g-5,skL.b-5);
+    cylinder(0,20,0,34,4.5,sk.r,sk.g,sk.b);
+    drawShoe3D(0,36);
+    c.restore();
+  }
+
+  // ==== TORSO (white t-shirt) ====
+  drawTorso3D(0,-4+by,false);
+
+  // ==== ARMS ====
+  // Back arm
+  c.save();c.translate(-11,-8+by);c.rotate((-armSw)*Math.PI/180);
+  // Sleeve
+  const slG=c.createLinearGradient(-4,-2,4,-2);
+  slG.addColorStop(0,'#d8d4cc');slG.addColorStop(.5,'#f2eee6');slG.addColorStop(1,'#c8c4bc');
+  c.fillStyle=slG;rRect(-4,-4,8,8,2);c.fill();
+  // Upper arm
+  cylinder(0,4,0,14,4.5,sk.r,sk.g,sk.b);
+  // Elbow
+  sphere(0,14,3.5,sk.r-5,sk.g-5,sk.b-5);
+  // Forearm
+  cylinder(0,14,0,24,4,sk.r,sk.g,sk.b);
+  // Forearm hair
+  c.strokeStyle='rgba(10,10,10,.05)';c.lineWidth=.4;
+  for(let i=0;i<6;i++){c.beginPath();c.moveTo(-1+Math.random()*3,15+i*1.5);c.lineTo(-1+Math.random()*3,16.5+i*1.5);c.stroke()}
+  // Hand
+  sphere(0,26,4,skL.r,skL.g,skL.b);
+  // Fingers hint
+  c.fillStyle=`rgb(${skL.r-10},${skL.g-10},${skL.b-10})`;
+  c.fillRect(-2,28,1.2,3);c.fillRect(0,28.5,1.2,3);c.fillRect(2,28,1.2,2.5);
+  c.restore();
+
+  // Front arm
+  c.save();c.translate(11,-8+by);c.rotate((armSw)*Math.PI/180);
+  c.fillStyle=slG;rRect(-4,-4,8,8,2);c.fill();
+  cylinder(0,4,0,14,4.5,sk.r,sk.g,sk.b);
+  sphere(0,14,3.5,sk.r-5,sk.g-5,sk.b-5);
+  cylinder(0,14,0,24,4,sk.r,sk.g,sk.b);
+  c.strokeStyle='rgba(10,10,10,.05)';c.lineWidth=.4;
+  for(let i=0;i<6;i++){c.beginPath();c.moveTo(-1+Math.random()*3,15+i*1.5);c.lineTo(-1+Math.random()*3,16.5+i*1.5);c.stroke()}
+  sphere(0,26,4,skL.r,skL.g,skL.b);
+  c.fillStyle=`rgb(${skL.r-10},${skL.g-10},${skL.b-10})`;
+  c.fillRect(-2,28,1.2,3);c.fillRect(0,28.5,1.2,3);c.fillRect(2,28,1.2,2.5);
+  c.restore();
+
+  // ==== NECK ====
+  cylinder(0,-12+by,0,-20+by,5.5,sk.r,sk.g,sk.b);
+  // Neck tendon
+  c.strokeStyle=`rgba(${skD.r},${skD.g},${skD.b},.2)`;c.lineWidth=.5;
+  c.beginPath();c.moveTo(-2,-12+by);c.lineTo(-1,-17+by);c.stroke();
+  c.beginPath();c.moveTo(2,-12+by);c.lineTo(1,-17+by);c.stroke();
+
+  // ==== HEAD ====
+  drawHead3D(0,-32+by,anim);
+
+  c.restore();
+}
+
+function drawTorso3D(tx,ty,bare){
+  if(bare){
+    // Bare torso (swimming)
+    const tg=c.createRadialGradient(tx-3,ty-4,2,tx,ty,18);
+    tg.addColorStop(0,`rgb(210,145,88)`);
+    tg.addColorStop(.5,`rgb(184,118,62)`);
+    tg.addColorStop(1,`rgb(140,85,40)`);
+    c.fillStyle=tg;
+    c.beginPath();
+    c.moveTo(tx-10,ty-10);c.quadraticCurveTo(tx-12,ty-8,tx-11,ty+8);
+    c.lineTo(tx-8,ty+12);c.lineTo(tx+8,ty+12);c.lineTo(tx+11,ty+8);
+    c.quadraticCurveTo(tx+12,ty-8,tx+10,ty-10);c.fill();
+    // Chest definition
+    c.strokeStyle='rgba(140,85,40,.3)';c.lineWidth=.8;
+    c.beginPath();c.moveTo(tx,ty-8);c.lineTo(tx,ty+4);c.stroke();
+    c.beginPath();c.arc(tx-4,ty-4,4,-.3,.8);c.stroke();
+    c.beginPath();c.arc(tx+4,ty-4,4,2.3,3.4);c.stroke();
+    // Abs hint
+    c.strokeStyle='rgba(140,85,40,.15)';
+    c.beginPath();c.moveTo(tx-3,ty+2);c.lineTo(tx+3,ty+2);c.stroke();
+    c.beginPath();c.moveTo(tx-3,ty+5);c.lineTo(tx+3,ty+5);c.stroke();
+  } else {
+    // White t-shirt with 3D shading
+    const tg=c.createRadialGradient(tx-3,ty-5,3,tx,ty,20);
+    tg.addColorStop(0,'#f8f5f0');
+    tg.addColorStop(.4,'#f0ece4');
+    tg.addColorStop(.8,'#ddd8d0');
+    tg.addColorStop(1,'#c4c0b8');
+    c.fillStyle=tg;
+    c.beginPath();
+    c.moveTo(tx-11,ty-12);c.quadraticCurveTo(tx-13,ty-10,tx-12,ty+8);
+    c.lineTo(tx-9,ty+12);c.lineTo(tx+9,ty+12);c.lineTo(tx+12,ty+8);
+    c.quadraticCurveTo(tx+13,ty-10,tx+11,ty-12);c.fill();
+    // Fabric folds
+    c.strokeStyle='rgba(160,155,145,.2)';c.lineWidth=.5;
+    c.beginPath();c.moveTo(tx-3,ty-8);c.quadraticCurveTo(tx-2,ty,tx-4,ty+10);c.stroke();
+    c.beginPath();c.moveTo(tx+4,ty-6);c.quadraticCurveTo(tx+3,ty+2,tx+5,ty+10);c.stroke();
+    // Chest shape through shirt
+    c.fillStyle='rgba(200,195,185,.15)';
+    c.beginPath();c.ellipse(tx-4,ty-4,4,5,-.1,0,Math.PI*2);c.fill();
+    c.beginPath();c.ellipse(tx+4,ty-4,4,5,.1,0,Math.PI*2);c.fill();
+    // Collar (V/round)
+    c.fillStyle='rgba(180,175,165,.3)';
+    c.beginPath();c.ellipse(tx,ty-12,7,2.5,0,0,Math.PI*2);c.fill();
+    // Collar shadow
+    c.strokeStyle='rgba(140,135,125,.3)';c.lineWidth=.8;
+    c.beginPath();c.ellipse(tx,ty-12,7,2.5,0,.2,Math.PI-.2);c.stroke();
+    // Small graphic hint on shirt
+    c.fillStyle='rgba(180,110,80,.06)';
+    c.fillRect(tx-5,ty-4,10,8);
+  }
+}
+
+function drawShoe3D(sx,sy){
+  const sg=c.createLinearGradient(sx-5,sy,sx+5,sy);
+  sg.addColorStop(0,'#1a1a1a');sg.addColorStop(.3,'#3a3a3a');sg.addColorStop(.7,'#2a2a2a');sg.addColorStop(1,'#111');
+  c.fillStyle=sg;
+  c.beginPath();
+  c.moveTo(sx-4,sy);c.lineTo(sx+6,sy);c.quadraticCurveTo(sx+8,sy+2,sx+7,sy+5);
+  c.lineTo(sx-4,sy+5);c.quadraticCurveTo(sx-5,sy+3,sx-4,sy);c.fill();
+  // Sole
+  c.fillStyle='#eee';c.fillRect(sx-4,sy+4,11,1.5);
+  // Stripe
+  c.fillStyle='rgba(255,255,255,.3)';c.fillRect(sx-2,sy+1,6,.8);
+}
+
+function drawHead3D(hx,hy,af){
+  c.save();
+  c.translate(hx,hy);
+
+  // ==== HEAD BASE (3D sphere-lit) ====
+  const hg=c.createRadialGradient(-3,-4,3,0,0,13);
+  hg.addColorStop(0,'#d4975a');  // highlight
+  hg.addColorStop(.3,'#c88a4e'); // light
+  hg.addColorStop(.6,'#b8763e'); // base
+  hg.addColorStop(.85,'#9a6230');// shadow
+  hg.addColorStop(1,'#7a4e22');  // deep shadow
+  c.fillStyle=hg;
+  c.beginPath();c.ellipse(0,0,11,13,0,0,Math.PI*2);c.fill();
+
+  // Jaw (angular, masculine)
+  const jg=c.createLinearGradient(-8,4,8,4);
+  jg.addColorStop(0,'#9a6230');jg.addColorStop(.3,'#c88a4e');jg.addColorStop(.7,'#b8763e');jg.addColorStop(1,'#8a5228');
+  c.fillStyle=jg;
+  c.beginPath();
+  c.moveTo(-9,3);c.lineTo(-7,12);c.quadraticCurveTo(0,14,7,12);c.lineTo(9,3);c.fill();
+
+  // Chin highlight
+  c.fillStyle='rgba(210,155,95,.3)';
+  c.beginPath();c.ellipse(0,11,3,2,0,0,Math.PI*2);c.fill();
+
+  // Cheek bones (3D)
+  c.fillStyle='rgba(210,150,90,.25)';
+  c.beginPath();c.ellipse(-5.5,4,3.5,2.5,-.15,0,Math.PI*2);c.fill();
+  c.beginPath();c.ellipse(5.5,4,3.5,2.5,.15,0,Math.PI*2);c.fill();
+
+  // ==== HAIR (3D volume, black with sheen) ====
+  // Main mass
+  const hairG=c.createRadialGradient(-2,-8,2,0,-4,13);
+  hairG.addColorStop(0,'#1a1a1a'); // slight highlight
+  hairG.addColorStop(.3,'#0e0e0e');
+  hairG.addColorStop(1,'#050505');
+  c.fillStyle=hairG;
+  c.beginPath();
+  c.moveTo(-10,-2);
+  c.quadraticCurveTo(-10,-10,-6,-16);
+  c.quadraticCurveTo(-3,-18.5,0,-18);
+  c.quadraticCurveTo(3,-18.5,6,-16);
+  c.quadraticCurveTo(10,-10,10,-2);
+  c.lineTo(10,-4);c.lineTo(-10,-4);
+  c.fill();
+
+  // Hair volume bump on top (wavy like photo)
+  c.fillStyle='#0a0a0a';
+  c.beginPath();
+  c.moveTo(-7,-10);
+  c.bezierCurveTo(-5,-19,-1,-20,2,-19);
+  c.bezierCurveTo(5,-18.5,8,-15,9,-8);
+  c.lineTo(8,-8);
+  c.bezierCurveTo(7,-14,4,-16,1,-17);
+  c.bezierCurveTo(-2,-17.5,-4,-16,-6,-10);
+  c.fill();
+
+  // Hair sheen/highlight (light reflecting)
+  c.fillStyle='rgba(50,50,50,.4)';
+  c.beginPath();c.ellipse(-1,-14,4,2,.1,0,Math.PI*2);c.fill();
+  c.fillStyle='rgba(60,60,60,.2)';
+  c.beginPath();c.ellipse(2,-13,2,1,0,0,Math.PI*2);c.fill();
+
+  // Side hair (short, clean)
+  c.fillStyle='#080808';
+  c.fillRect(-11,-5,2.5,8);c.fillRect(8.5,-5,2.5,8);
+  // Sideburns
+  c.fillStyle='#0a0a0a';
+  c.fillRect(-11,1,2,5);c.fillRect(9,1,2,5);
+
+  // Hair strand details
+  c.strokeStyle='rgba(30,30,30,.3)';c.lineWidth=.6;
+  c.beginPath();c.moveTo(-4,-16);c.quadraticCurveTo(-3,-18,-1,-17.5);c.stroke();
+  c.beginPath();c.moveTo(0,-17);c.quadraticCurveTo(2,-19,4,-16);c.stroke();
+
+  // Forehead (skin showing below hairline)
+  c.fillStyle='#c88a4e';
+  c.beginPath();c.ellipse(0,-4,8,2.5,0,0,Math.PI);c.fill();
+
+  // ==== EYEBROWS (thick, shaped) ====
+  c.fillStyle='#111';
+  // Left
+  c.beginPath();
+  c.moveTo(-8,-4);c.quadraticCurveTo(-5.5,-6.5,-2.5,-5);
+  c.lineTo(-2.5,-3.8);c.quadraticCurveTo(-5.5,-4.8,-8,-3);c.fill();
+  // Right
+  c.beginPath();
+  c.moveTo(8,-4);c.quadraticCurveTo(5.5,-6.5,2.5,-5);
+  c.lineTo(2.5,-3.8);c.quadraticCurveTo(5.5,-4.8,8,-3);c.fill();
+
+  // ==== EYES (3D, expressive, warm) ====
+  // Eye sockets
+  c.fillStyle='rgba(120,70,35,.25)';
+  c.beginPath();c.ellipse(-4.5,-1,4.5,3.5,0,0,Math.PI*2);c.fill();
+  c.beginPath();c.ellipse(4.5,-1,4.5,3.5,0,0,Math.PI*2);c.fill();
+
+  // Eye whites with shading
+  const ewg=c.createRadialGradient(-4.5,-1.5,0,-4.5,-1,3.5);
+  ewg.addColorStop(0,'#f5f0e8');ewg.addColorStop(.7,'#e8e2d8');ewg.addColorStop(1,'#d0c8bc');
+  c.fillStyle=ewg;
+  c.beginPath();c.ellipse(-4.5,-1,3.8,2.8,-.05,0,Math.PI*2);c.fill();
+  const ewg2=c.createRadialGradient(4.5,-1.5,0,4.5,-1,3.5);
+  ewg2.addColorStop(0,'#f5f0e8');ewg2.addColorStop(.7,'#e8e2d8');ewg2.addColorStop(1,'#d0c8bc');
+  c.fillStyle=ewg2;
+  c.beginPath();c.ellipse(4.5,-1,3.8,2.8,.05,0,Math.PI*2);c.fill();
+
+  // Iris (dark brown, 3D)
+  const ig=c.createRadialGradient(-4,-.8,.3,-4,-.8,2.3);
+  ig.addColorStop(0,'#3a2510');ig.addColorStop(.5,'#2a1808');ig.addColorStop(1,'#1a0e04');
+  c.fillStyle=ig;
+  c.beginPath();c.arc(-4,-.8,2.3,0,Math.PI*2);c.fill();
+  const ig2=c.createRadialGradient(5,-.8,.3,5,-.8,2.3);
+  ig2.addColorStop(0,'#3a2510');ig2.addColorStop(.5,'#2a1808');ig2.addColorStop(1,'#1a0e04');
+  c.fillStyle=ig2;
+  c.beginPath();c.arc(5,-.8,2.3,0,Math.PI*2);c.fill();
+
+  // Pupil
+  c.fillStyle='#050505';
+  c.beginPath();c.arc(-4,-.8,1.1,0,Math.PI*2);c.fill();
+  c.beginPath();c.arc(5,-.8,1.1,0,Math.PI*2);c.fill();
+
+  // Eye highlights (lifelike sparkle)
+  c.fillStyle='rgba(255,255,255,.8)';
+  c.beginPath();c.arc(-5,-1.8,.7,0,Math.PI*2);c.fill();
+  c.beginPath();c.arc(4,-1.8,.7,0,Math.PI*2);c.fill();
+  // Secondary highlight
+  c.fillStyle='rgba(255,255,255,.3)';
+  c.beginPath();c.arc(-3.2,.2,.4,0,Math.PI*2);c.fill();
+  c.beginPath();c.arc(5.8,.2,.4,0,Math.PI*2);c.fill();
+
+  // Upper eyelid crease
+  c.strokeStyle='rgba(100,60,30,.3)';c.lineWidth=.6;
+  c.beginPath();c.ellipse(-4.5,-1,4,-2,-.05,Math.PI+.3,-.3);c.stroke();
+  c.beginPath();c.ellipse(4.5,-1,4,-2,.05,Math.PI+.3,-.3);c.stroke();
+
+  // Lower lash line
+  c.strokeStyle='rgba(80,50,25,.25)';c.lineWidth=.4;
+  c.beginPath();c.ellipse(-4.5,-1,3.8,2.8,-.05,.2,Math.PI-.2);c.stroke();
+  c.beginPath();c.ellipse(4.5,-1,3.8,2.8,.05,.2,Math.PI-.2);c.stroke();
+
+  // ==== NOSE (3D with bridge, tip, nostrils) ====
+  // Bridge shadow
+  c.fillStyle='rgba(140,85,40,.2)';
+  c.beginPath();c.moveTo(.5,-2);c.lineTo(2.5,4);c.lineTo(1,5);c.lineTo(-.5,5);c.lineTo(.5,3);c.fill();
+  // Nose tip (sphere-like)
+  const ng=c.createRadialGradient(1,5,-0.5,1,5,3);
+  ng.addColorStop(0,'#d4975a');ng.addColorStop(.6,'#b8763e');ng.addColorStop(1,'#9a6230');
+  c.fillStyle=ng;
+  c.beginPath();c.ellipse(1,5,3,2.2,0,0,Math.PI*2);c.fill();
+  // Nose highlight
+  c.fillStyle='rgba(220,170,110,.3)';
+  c.beginPath();c.ellipse(.5,4,1.2,.8,0,0,Math.PI*2);c.fill();
+  // Nostrils
+  c.fillStyle='#6a4420';
+  c.beginPath();c.ellipse(-.5,6.2,1.2,.7,.2,0,Math.PI*2);c.fill();
+  c.beginPath();c.ellipse(2.5,6.2,1.2,.7,-.2,0,Math.PI*2);c.fill();
+
+  // ==== SMILE (warm, showing teeth like photo) ====
+  // Upper lip
+  const lipG=c.createLinearGradient(0,7.5,0,9);
+  lipG.addColorStop(0,'#a05838');lipG.addColorStop(1,'#8a4830');
+  c.fillStyle=lipG;
+  c.beginPath();
+  c.moveTo(-5,8);c.quadraticCurveTo(-2.5,7,0,7.5);c.quadraticCurveTo(2.5,7,5,8);
+  c.quadraticCurveTo(3,9.5,0,9.5);c.quadraticCurveTo(-3,9.5,-5,8);c.fill();
+
+  // Teeth
+  c.fillStyle='#f2ede5';
+  c.fillRect(-3.5,8,7,2);
+  // Tooth lines
+  c.strokeStyle='rgba(200,195,185,.3)';c.lineWidth=.3;
+  for(let i=-2;i<=2;i+=1.3){c.beginPath();c.moveTo(i,8);c.lineTo(i,9.8);c.stroke()}
+
+  // Lower lip (fuller, 3D)
+  const llg=c.createRadialGradient(0,10.5,0,0,10.5,4);
+  llg.addColorStop(0,'#b86848');llg.addColorStop(.5,'#a05838');llg.addColorStop(1,'#884830');
+  c.fillStyle=llg;
+  c.beginPath();
+  c.moveTo(-4.5,9.5);c.quadraticCurveTo(0,13,4.5,9.5);c.fill();
+  // Lip highlight
+  c.fillStyle='rgba(220,140,100,.2)';
+  c.beginPath();c.ellipse(0,10.5,2,1,0,0,Math.PI*2);c.fill();
+
+  // Smile creases
+  c.strokeStyle='rgba(120,70,35,.2)';c.lineWidth=.6;
+  c.beginPath();c.moveTo(-6.5,5);c.quadraticCurveTo(-7,7.5,-5.5,9);c.stroke();
+  c.beginPath();c.moveTo(6.5,5);c.quadraticCurveTo(7,7.5,5.5,9);c.stroke();
+
+  // ==== STUBBLE (subtle, realistic) ====
+  c.fillStyle='rgba(5,5,5,.04)';
+  c.beginPath();
+  c.moveTo(-6,6);c.quadraticCurveTo(-5,13,0,14);c.quadraticCurveTo(5,13,6,6);c.fill();
+  // Dot pattern
+  c.fillStyle='rgba(5,5,5,.035)';
+  for(let i=0;i<30;i++){
+    const sx2=-5+Math.random()*10,sy2=7+Math.random()*6;
+    const d=Math.sqrt(sx2*sx2+(sy2-10)*(sy2-10));
+    if(d<7)c.fillRect(sx2,sy2,.6,.6);
+  }
+
+  // ==== EARS (3D) ====
+  // Left
+  const eg=c.createRadialGradient(-11,0,0,-11,0,4);
+  eg.addColorStop(0,'#c88a4e');eg.addColorStop(.5,'#b8763e');eg.addColorStop(1,'#8a5228');
+  c.fillStyle=eg;
+  c.beginPath();c.ellipse(-11,0,3.5,5,0,0,Math.PI*2);c.fill();
+  c.fillStyle='#9a6230';c.beginPath();c.ellipse(-11,0,2,3,0,0,Math.PI*2);c.fill();
+  c.fillStyle='#7a4e22';c.beginPath();c.arc(-11,.5,1.2,0,Math.PI*2);c.fill();
+
+  c.restore();
+}
+
+// =========================================================
+// RENDER
+// =========================================================
+function render(){
+  c.clearRect(0,0,960,720);
+  const bg=c.createLinearGradient(0,0,0,720);
+  bg.addColorStop(0,'#12121f');bg.addColorStop(1,'#1a1a2e');
+  c.fillStyle=bg;c.fillRect(0,0,960,720);
+
+  // Title
+  c.textAlign='center';
+  c.fillStyle='#c4956a';c.font='bold 30px Georgia';
+  c.fillText("Duleep - 3D Realistic Character",480,38);
+  c.fillStyle='#7a6a5a';c.font='14px Georgia';
+  c.fillText("Canvas 2D with gradient shading, 3D lighting, and realistic proportions",480,58);
+
+  // ---- LARGE PORTRAIT ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(20,75,260,320);
+  c.fillStyle='#5a4a3a';c.font='11px system-ui';c.textAlign='center';
+  c.fillText('Portrait (3.5x)',150,88);
+  drawDuleep3D(150,280,3.5,1,frame,'idle');
+
+  // ---- IDLE ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(295,75,150,320);
+  c.fillStyle='#5a4a3a';c.fillText('Idle (2.5x)',370,88);
+  drawDuleep3D(370,280,2.5,1,frame,'idle');
+
+  // ---- RUN ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(460,75,150,320);
+  c.fillStyle='#5a4a3a';c.fillText('Running (2.5x)',535,88);
+  drawDuleep3D(535,280,2.5,1,frame,'run');
+
+  // ---- KICK ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(625,75,150,320);
+  c.fillStyle='#5a4a3a';c.fillText('Kick (2.5x)',700,88);
+  drawDuleep3D(700,280,2.5,1,frame,'kick');
+
+  // ---- SWIM ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(790,75,155,320);
+  c.fillStyle='#5a4a3a';c.fillText('Swimming (2.5x)',867,88);
+  c.fillStyle='rgba(20,60,140,.15)';c.fillRect(790,230,155,165);
+  drawDuleep3D(867,270,2.5,1,frame,'swim');
+
+  // ---- FACE CLOSE-UP (6x) ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(20,410,300,295);
+  c.fillStyle='#5a4a3a';c.font='11px system-ui';
+  c.fillText('Face Detail (6x)',170,423);
+  c.save();c.translate(170,570);c.scale(6,6);
+  drawHead3D(0,0,frame);
+  c.restore();
+
+  // ---- GAME SCALES ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(335,410,300,295);
+  c.fillStyle='#5a4a3a';c.fillText('In-Game Scales',485,423);
+
+  drawDuleep3D(380,590,1,1,frame,'run');
+  c.fillStyle='#444';c.font='9px system-ui';c.fillText('1x',380,620);
+  drawDuleep3D(430,580,1.5,1,frame,'idle');
+  c.fillText('1.5x',430,620);
+  drawDuleep3D(500,565,2,1,frame,'run');
+  c.fillText('2x',500,620);
+  drawDuleep3D(575,565,2,-1,frame,'kick');
+  c.fillText('Facing L',575,620);
+
+  // Animation strip
+  c.fillStyle='#5a4a3a';c.font='10px system-ui';
+  c.fillText('Run Cycle:',485,645);
+  for(let i=0;i<10;i++){
+    drawDuleep3D(360+i*27,680,1,1,i*6,'run');
+  }
+
+  // ---- FEATURES ----
+  c.fillStyle='rgba(255,255,255,.03)';c.fillRect(650,410,295,295);
+  c.fillStyle='#5a4a3a';c.fillText('Rendering Features',797,423);
+
+  c.fillStyle='#7a6a5a';c.font='11px Georgia';c.textAlign='left';
+  const feats=[
+    '\u2022 3D radial gradient sphere shading',
+    '\u2022 Directional lighting (top-left)',
+    '\u2022 Gradient cylinders for limbs',
+    '\u2022 Realistic eye rendering with iris depth',
+    '\u2022 Hair volume with specular highlight',
+    '\u2022 Muscle definition & calf contours',
+    '\u2022 Fabric folds & shirt chest shape',
+    '\u2022 Stubble dot pattern on jaw',
+    '\u2022 Warm smile with visible teeth',
+    '\u2022 Skin: Warm brown (#b8763e)',
+    '\u2022 Hair: Black with wavy volume',
+    '\u2022 Eyes: Dark brown, bright & kind',
+    '\u2022 Build: Athletic, broad shoulders',
+    '',
+    'Outfits per level:',
+    '  Soccer \u2192 Dark jersey + shorts',
+    '  Racing \u2192 Red shirt (visible in car)',
+    '  Swimming \u2192 Bare torso + shorts',
+  ];
+  feats.forEach((f,i)=>{
+    c.fillStyle=f.startsWith('Out')?'#c4956a':'#7a6a5a';
+    c.fillText(f,662,445+i*15);
+  });
+
+  frame++;
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>
