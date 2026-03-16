@@ -527,9 +527,6 @@ function initLevel1() {
   const ball = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
   ball.position.set(0, 0.3, 0); ball.castShadow = true; scene.add(ball);
 
-  // Keeper
-  const keeper = createCharacter(); keeper.position.set(26, 0, 0); keeper.userData.shirtMat.color.setHex(0xcc2222); scene.add(keeper);
-
   // Opponent striker who tries to score against you!
   const opponent = createCharacter(); opponent.position.set(5, 0, 0); opponent.userData.shirtMat.color.setHex(0x2255CC); scene.add(opponent);
 
@@ -540,7 +537,7 @@ function initLevel1() {
 
   cameraMode = 'follow'; cameraOffset.set(0, 5, 10);
   levelData = {
-    ball, keeper, opponent, goals: 0, oppGoals: 0, maxGoals: 3,
+    ball, opponent, goals: 0, oppGoals: 0, maxGoals: 3,
     ballVel: new THREE.Vector3(), ballKicked: false, kickCooldown: 0,
     oppState: 'chase', oppKickCd: 0, oppThinkTimer: 0,
     started: false, hiddenHeart
@@ -584,7 +581,7 @@ function updateLevel1(dt) {
   const bx = ld.ball.position.x - opp.position.x, bz = ld.ball.position.z - opp.position.z;
   const bDist = Math.sqrt(bx * bx + bz * bz);
   if (bDist > 1.0) {
-    const oppSpeed = 5.5;
+    const oppSpeed = 3.5;
     opp.position.x += (bx / bDist) * oppSpeed * dt;
     opp.position.z += (bz / bDist) * oppSpeed * dt;
     opp.rotation.y = Math.atan2(bx, bz);
@@ -636,12 +633,6 @@ function updateLevel1(dt) {
 
     if (Math.abs(ld.ball.position.x) > 32 || Math.abs(ld.ball.position.z) > 22) { ld.ball.position.set(0, 0.3, 0); ld.ballVel.set(0, 0, 0); ld.ballKicked = false; }
   }
-
-  // Keeper AI
-  const kp = ld.keeper; kp.userData.animState = 'walk'; animateCharacter(kp, dt, 1);
-  kp.position.z += (ld.ball.position.z * 0.7 - kp.position.z) * dt * 3;
-  kp.position.z = THREE.MathUtils.clamp(kp.position.z, -3, 3); kp.rotation.y = Math.PI;
-  if (ld.ballKicked && ld.ball.position.x > 25 && Math.abs(ld.ball.position.z - kp.position.z) < 1.5) { ld.ballVel.x = -Math.abs(ld.ballVel.x) * 0.5; ld.ballVel.z += (Math.random() - 0.5) * 5; }
 
   // Heart
   updateHiddenHeart(ld.hiddenHeart, dt);
